@@ -12,6 +12,7 @@ enum DropboxStatus {
     NotRunning,
     UpToDate,
     Starting,
+    Connecting,
     Else(String)
 }
 
@@ -27,15 +28,16 @@ impl Dropbox {
             .expect("Failed to wait on child");
         assert!(output.status.success());
         String::from_utf8(output.stdout)
-            .expect("Failed to decode output")
+            .expect("Failed to decode output").trim().to_string()
     }
 
     fn status(&self) -> DropboxStatus {
-        match self.run("status") {
-            ref s if *s == String::from("Dropbox isn't running!\n") => DropboxStatus::NotRunning,
-            ref s if *s == String::from("Up to date\n") => DropboxStatus::UpToDate,
-            ref s if *s == String::from("Starting\n") => DropboxStatus::Starting,
-            s => DropboxStatus::Else(s)
+        match self.run("status").as_str() {
+            s if s == "Dropbox isn't running!" => DropboxStatus::NotRunning,
+            s if s == "Connecting..." => DropboxStatus::Connecting,
+            s if s == "Starting..." => DropboxStatus::Starting,
+            s if s == "Up to date" => DropboxStatus::UpToDate,
+            s => DropboxStatus::Else(s.to_string())
         }
     }
 
@@ -43,14 +45,14 @@ impl Dropbox {
         self.status() != DropboxStatus::NotRunning
     }
 
-    fn start(&self) -> bool {
+    fn start(&self) {
         self.run("start");
-        self.is_running()
+        assert!(self.is_running())
     }
 
-    fn stop(&self) -> bool {
+    fn stop(&self) {
         self.run("stop");
-        !self.is_running()
+        assert!(!self.is_running())
     }
 
 }
@@ -59,10 +61,12 @@ fn main() {
     let db = Dropbox();
     println!("Starting...");
     db.start();
-    while db.status() != DropboxStatus::UpToDate {
-        println!("Syncing...");
+    let mut status = db.status();
+    while status != DropboxStatus::UpToDate {
+        println!("Syncing... [{:?}]", status);
         let t = time::Duration::from_millis(1000);
         thread::sleep(t);
+        status = db.status();
     }
     println!("Stopping...");
     db.stop();
