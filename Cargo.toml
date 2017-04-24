@@ -1,0 +1,6 @@
+[package]
+name = "dropbox-update"
+version = "0.1.0"
+authors = ["Lorenzo Bolla <lorenzo.bolla@yougov.com>"]
+
+[dependencies]
